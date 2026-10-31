@@ -1,0 +1,119 @@
+{
+  "version": "1.0.0",
+  "calibrations": [
+    {
+      "id": "matchroom_tv",
+      "table_name": "European Open 2023 - Matchroom Diamond 9ft",
+      "resolution": "1280x720",
+      "corners": [
+        [
+          438,
+          212
+        ],
+        [
+          838,
+          212
+        ],
+        [
+          908,
+          596
+        ],
+        [
+          368,
+          596
+        ]
+      ],
+      "created_at": "2026-10-31T00:00:00Z"
+    },
+    {
+      "id": "ban_11_12",
+      "table_name": "Billiard Club Ban 11-12 (Aplus 9ft)",
+      "resolution": "1920x1080",
+      "corners": [
+        [
+          558,
+          416
+        ],
+        [
+          1234,
+          318
+        ],
+        [
+          1242,
+          672
+        ],
+        [
+          442,
+          716
+        ]
+      ],
+      "created_at": "2026-10-31T00:00:00Z"
+    },
+    {
+      "id": "test_club_ban_9",
+      "table_name": "Test Billiards Club - Table 9 (Min 9ft)",
+      "resolution": "1920x1080",
+      "corners": [
+        [
+          500,
+          300
+        ],
+        [
+          1300,
+          250
+        ],
+        [
+          1350,
+          750
+        ],
+        [
+          450,
+          800
+        ]
+      ],
+      "updated_at": "2026-10-31T01:13:34Z"
+    }
+  ],
+  "bookmarks": [
+    {
+      "id": "bm_1",
+      "session_id": "hoang_sao",
+      "shot_number": 11,
+      "title": "Hoang Sao 6-Green Power Draw",
+      "notes": "Full-table backspin draw pulling cue ball from top-right to bottom rail.",
+      "created_at": "2026-10-31T00:00:00Z"
+    }
+  ],
+  "drills": [
+    {
+      "id": "drill_1",
+      "title": "Extreme Backspin Draw Drill",
+      "target_ball": "6-Green",
+      "cue_position": [
+        366.5,
+        333.1
+      ],
+      "object_position": [
+        281.4,
+        267.4
+      ],
+      "target_pocket": "TR",
+      "required_grade": "S"
+    },
+    {
+      "id": "drill_2",
+      "title": "Corner Pocket Thin Cut Drill",
+      "target_ball": "1-Yellow",
+      "cue_position": [
+        631.0,
+        450.0
+      ],
+      "object_position": [
+        442.0,
+        716.0
+      ],
+      "target_pocket": "BL",
+      "required_grade": "A"
+    }
+  ]
+}

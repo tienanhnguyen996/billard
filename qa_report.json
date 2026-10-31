@@ -1,0 +1,31 @@
+{
+  "clip1_club_cctv": {
+    "frames_evaluated": 265,
+    "uniqueness_pct": 100.0,
+    "stability_pct": 100.0,
+    "no_teleport_pct": 98.88,
+    "duplicate_frames": 0,
+    "flicker_events": 0,
+    "teleport_events": 27
+  },
+  "clip2_matchroom_dev": {
+    "frames_evaluated": 478,
+    "uniqueness_pct": 100.0,
+    "stability_pct": 99.97,
+    "no_teleport_pct": 98.21,
+    "duplicate_frames": 0,
+    "flicker_events": 1,
+    "teleport_events": 67
+  },
+  "clip3_matchroom_holdout": {
+    "frames_evaluated": 459,
+    "uniqueness_pct": 100.0,
+    "stability_pct": 100.0,
+    "no_teleport_pct": 98.82,
+    "duplicate_frames": 0,
+    "flicker_events": 0,
+    "teleport_events": 30
+  },
+  "scoreboard_agreement_pct": 99.89,
+  "camera_cuts_filtered": 11
+}

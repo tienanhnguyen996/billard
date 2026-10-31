@@ -1,0 +1,45 @@
+# Git ignore for Railbird AI / Billard
+
+# Large video files
+SAMPLE.mp4
+*.avi
+*.mov
+*.mkv
+
+# Large pretrained weights (>100MB) and temp parts
+pretrained_models/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.part
+
+# Training datasets and run outputs (generated images)
+datasets/
+runs/
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+.npm/
+
+# Python cache & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+*.egg-info/
+
+# Logs & temp
+*.log
+*.tmp
+dist/
+scratch/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
