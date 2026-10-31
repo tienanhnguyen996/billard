@@ -91,6 +91,7 @@ def load_yolo_detector(model_path=None):
     """Loads YOLO ball detector model if available."""
     candidates = [
         model_path,
+        "pretrained_models/best_pool_1280.pt",
         "pretrained_models/railbird_ball_best.pt",
         "yolo26n.pt"
     ]

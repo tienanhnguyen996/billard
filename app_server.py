@@ -427,7 +427,8 @@ class RailbirdProductionHandler(SimpleHTTPRequestHandler):
             cuda_avail = torch.cuda.is_available()
             device_name = torch.cuda.get_device_name(0) if cuda_avail else "CPU"
 
-            detector_path = os.path.join(BASE_DIR, "pretrained_models", "railbird_ball_best.pt")
+            detector_1280_path = os.path.join(BASE_DIR, "pretrained_models", "best_pool_1280.pt")
+            detector_path = detector_1280_path if os.path.exists(detector_1280_path) else os.path.join(BASE_DIR, "pretrained_models", "railbird_ball_best.pt")
             cls_path = os.path.join(BASE_DIR, "pretrained_models", "railbird_ball_cls.pt")
 
             db = load_db()
@@ -443,9 +444,10 @@ class RailbirdProductionHandler(SimpleHTTPRequestHandler):
                 "pytorch_version": torch.__version__,
                 "models": {
                     "ball_detector": {
-                        "name": "railbird_ball_best.pt",
+                        "name": os.path.basename(detector_path),
                         "exists": os.path.exists(detector_path),
-                        "size_bytes": os.path.getsize(detector_path) if os.path.exists(detector_path) else 0
+                        "size_bytes": os.path.getsize(detector_path) if os.path.exists(detector_path) else 0,
+                        "is_high_res_1280": os.path.exists(detector_1280_path)
                     },
                     "ball_classifier": {
                         "name": "railbird_ball_cls.pt",
@@ -480,6 +482,15 @@ class RailbirdProductionHandler(SimpleHTTPRequestHandler):
         elif path == "/api/db":
             db = load_db()
             self.send_json_response(200, {"success": True, "db": db})
+            return
+
+        elif path == "/api/download_status":
+            try:
+                from scripts.monitor_downloads import check_download
+                status = check_download()
+            except Exception as e:
+                status = {"status": "error", "error": str(e)}
+            self.send_json_response(200, {"success": True, "download": status})
             return
 
         self.send_json_response(404, {"success": False, "error": f"Unknown GET endpoint: {path}"})
