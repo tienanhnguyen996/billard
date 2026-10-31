@@ -243,10 +243,16 @@ export const PlayerStudio: React.FC<PlayerStudioProps> = ({
           <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--mut)' }}>SESSION:</span>
           <div className="rb-session-pills">
             <button
+              className={`rb-pill-btn ${sessionMode === 'topcam' ? 'active' : ''}`}
+              onClick={() => onSelectSession('topcam')}
+            >
+              🎯 Top-Cam Drill (1:1 Overhead)
+            </button>
+            <button
               className={`rb-pill-btn ${sessionMode === 'hs' ? 'active' : ''}`}
               onClick={() => onSelectSession('hs')}
             >
-              🏆 Dương Quốc Hoàng (Matchroom Runout)
+              🏆 Dương Quốc Hoàng (Broadcast)
             </button>
             <button
               className={`rb-pill-btn ${sessionMode === 'club' ? 'active' : ''}`}

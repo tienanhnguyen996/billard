@@ -11,7 +11,8 @@ import { QaView } from './components/QaView';
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState('match');
-  const [sessionMode, setSessionMode] = useState('hs');
+  const [sessionMode, setSessionMode] = useState('topcam');
+  const [topcamSession, setTopcamSession] = useState<SessionData | null>(null);
   const [hsSession, setHsSession] = useState<SessionData | null>(null);
   const [clubSession, setClubSession] = useState<SessionData | null>(null);
   const [activeDrill, setActiveDrill] = useState<DrillDef | null>(null);
@@ -19,17 +20,21 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     Promise.all([
-      fetch('/hoang_sao_session.json').then(r => r.json()),
-      fetch('/session_data.json').then(r => r.json())
+      fetch('/overhead_session.json').then(r => r.json()).catch(() => null),
+      fetch('/hoang_sao_session.json').then(r => r.json()).catch(() => null),
+      fetch('/session_data.json').then(r => r.json()).catch(() => null)
     ])
-      .then(([hsData, clubData]) => {
-        setHsSession(hsData);
-        setClubSession(clubData);
+      .then(([topcamData, hsData, clubData]) => {
+        setTopcamSession(topcamData || (window as any).OVERHEAD_SESSION);
+        setHsSession(hsData || (window as any).HOANG_SAO_SESSION);
+        setClubSession(clubData || (window as any).RAILBIRD_SESSION);
         setLoading(false);
       })
       .catch((err) => {
         console.error('Failed to load sessions from server:', err);
-        // Fallback to window globals if served statically
+        if ((window as any).OVERHEAD_SESSION) {
+          setTopcamSession((window as any).OVERHEAD_SESSION);
+        }
         if ((window as any).HOANG_SAO_SESSION) {
           setHsSession((window as any).HOANG_SAO_SESSION);
         }
@@ -40,7 +45,11 @@ export const App: React.FC = () => {
       });
   }, []);
 
-  const activeSession = (sessionMode === 'hs' ? hsSession : clubSession) || hsSession;
+  const activeSession = (
+    sessionMode === 'topcam' ? topcamSession :
+    sessionMode === 'hs' ? hsSession :
+    clubSession
+  ) || topcamSession || hsSession;
 
   const handleLaunchDrill = (drill: DrillDef) => {
     setActiveDrill(drill);
