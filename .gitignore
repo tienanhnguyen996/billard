@@ -7,8 +7,6 @@ SAMPLE.mp4
 *.mkv
 
 # Large pretrained weights (>100MB) and temp parts
-pretrained_models/
-*.pt
 *.pth
 *.onnx
 *.engine
