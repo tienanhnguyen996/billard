@@ -41,6 +41,18 @@ def test_a_uniqueness_no_duplicates():
         assert len(labels) == len(set(labels)), f"Duplicate label at session_data frame {idx}: {labels}"
     print(f"  [PASS] session_data.json: 0 duplicates across all {len(s_timeline)} frames.")
 
+    # 3. overhead_session.json
+    oh_path = os.path.join(ROOT_DIR, "overhead_session.json")
+    assert os.path.exists(oh_path), f"Missing {oh_path}"
+    with open(oh_path, "r", encoding="utf-8") as f:
+        oh_data = json.load(f)
+    oh_timeline = oh_data.get("timeline_sample", [])
+    assert len(oh_timeline) > 100, f"Expected >100 frames in overhead, found {len(oh_timeline)}"
+    for idx, f in enumerate(oh_timeline):
+        labels = [b["label"] for b in f.get("balls", [])]
+        assert len(labels) == len(set(labels)), f"Duplicate label at overhead frame {idx}: {labels}"
+    print(f"  [PASS] overhead_session.json: 0 duplicates across all {len(oh_timeline)} frames.")
+
 
 def test_b_shot_metrics_and_coaching():
     print("[TEST B] Checking shot ratings and coaching fields across all shots...")
@@ -126,6 +138,7 @@ def test_c_video_h264_compliance():
     print("[TEST C] Checking video file existence, H.264 (avc1) codec, dimensions, and playability...")
     videos = [
         "SAMPLE.mp4",
+        "overhead_drill.mp4",
         "hoang_sao.mp4",
         "output_railbird.mp4",
         "output_hoang_sao_runout.mp4",
@@ -168,6 +181,7 @@ def test_d_http_server_endpoints():
     print("[TEST D] Checking HTTP 200 responses from http://localhost:8080...")
     endpoints = [
         "index.html",
+        "overhead_session.js",
         "hoang_sao_session.js",
         "session_data.js",
         "qa_report.js",

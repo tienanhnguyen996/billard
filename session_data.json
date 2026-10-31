@@ -1,5 +1,5 @@
 {
-  "video_file": "SAMPLE.mp4",
+  "video_file": "output_railbird.mp4",
   "annotated_video": "output_railbird.mp4",
   "table_name": "BAN 11-12 (Dragon / Aplus 9ft)",
   "resolution": "1920x1080",
@@ -51380,5 +51380,7 @@
       550,
       428
     ]
-  ]
+  ],
+  "match_title": "Club CCTV: Railbird 9-Ball (BAN_11-12)",
+  "player_1": "Player 1 (CCTV Match)"
 }
