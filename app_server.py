@@ -58,6 +58,8 @@ BASE_DIR = os.path.abspath("c:/billard")
 DB_PATH = os.path.join(BASE_DIR, "railbird_db.json")
 CLIPS_DIR = os.path.join(BASE_DIR, "clips")
 os.makedirs(CLIPS_DIR, exist_ok=True)
+UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
+os.makedirs(UPLOADS_DIR, exist_ok=True)
 FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
 
 # Thread-safe in-memory background job tracking
@@ -704,6 +706,110 @@ class RailbirdProductionHandler(SimpleHTTPRequestHandler):
                 "job_id": job_id,
                 "status": "running",
                 "message": "Analysis started in background thread"
+            })
+            return
+
+        elif path == "/api/upload_video":
+            video_input = body.get("video_path", body.get("filename", "SAMPLE.mp4"))
+            b64_data = body.get("video_data_base64", "")
+            preset = body.get("preset", "ban_11_12")
+            corners_str = body.get("corners", "")
+            max_sec = body.get("end_sec", None)
+            table_name = body.get("title", f"Uploaded Session ({preset})")
+
+            # Determine corners based on preset if not explicitly specified
+            if not corners_str:
+                if preset == "matchroom":
+                    corners_str = "438,212,838,212,908,596,368,596"
+                elif preset == "topcam":
+                    corners_str = "0,0,1280,0,1280,720,0,720"
+                else:
+                    corners_str = "558,416,1234,318,1242,672,442,716"
+
+            job_id = f"job_up_{int(time.time())}"
+            target_video_rel = f"uploads/{os.path.basename(video_input)}"
+            target_video_abs = os.path.join(BASE_DIR, target_video_rel)
+
+            # If base64 payload provided, write to uploads folder
+            if b64_data:
+                try:
+                    if "," in b64_data:
+                        b64_data = b64_data.split(",", 1)[1]
+                    file_bytes = base64.b64decode(b64_data)
+                    with open(target_video_abs, "wb") as f:
+                        f.write(file_bytes)
+                except Exception as ex:
+                    self.send_json_response(400, {"success": False, "error": f"Failed to save uploaded video: {ex}"})
+                    return
+            else:
+                # Video file already on disk (e.g. SAMPLE.mp4, hoang_sao.mp4)
+                if os.path.exists(os.path.join(BASE_DIR, video_input)):
+                    target_video_abs = os.path.join(BASE_DIR, video_input)
+                    target_video_rel = video_input
+                elif os.path.exists(target_video_abs):
+                    pass
+                else:
+                    target_video_abs = os.path.join(BASE_DIR, "SAMPLE.mp4")
+                    target_video_rel = "SAMPLE.mp4"
+
+            out_json_rel = f"uploads/session_{job_id}.json"
+            out_json_abs = os.path.join(BASE_DIR, out_json_rel)
+
+            with JOBS_LOCK:
+                JOBS[job_id] = {
+                    "id": job_id,
+                    "status": "processing",
+                    "progress": 15.0,
+                    "stage": "Video ingested. Initializing CV analysis...",
+                    "video": target_video_rel,
+                    "start_time": time.time(),
+                    "result": None,
+                    "error": None
+                }
+
+            def upload_worker():
+                try:
+                    with JOBS_LOCK:
+                        JOBS[job_id]["progress"] = 30.0
+                        JOBS[job_id]["stage"] = "Computing 4-corner homography & table radar..."
+
+                    from analyze_any_video import run_analysis
+                    payload = run_analysis(
+                        video_path=target_video_abs,
+                        corners_str=corners_str,
+                        out_json_path=out_json_abs,
+                        max_seconds=float(max_sec) if max_sec else None,
+                        stride=3,
+                        export_js=True,
+                        table_name=table_name
+                    )
+
+                    with JOBS_LOCK:
+                        JOBS[job_id]["status"] = "completed"
+                        JOBS[job_id]["progress"] = 100.0
+                        JOBS[job_id]["stage"] = "Analysis complete!"
+                        JOBS[job_id]["result"] = {
+                            "shots_count": len(payload.get("shots", [])),
+                            "duration_sec": payload.get("duration_sec"),
+                            "pot_pct": payload.get("summary", {}).get("pot_pct", 0),
+                            "session_path": out_json_rel,
+                            "video_path": target_video_rel,
+                            "payload": payload
+                        }
+                except Exception as ex:
+                    with JOBS_LOCK:
+                        JOBS[job_id]["status"] = "failed"
+                        JOBS[job_id]["error"] = str(ex)
+
+            th = threading.Thread(target=upload_worker, daemon=True)
+            th.start()
+
+            self.send_json_response(200, {
+                "success": True,
+                "job_id": job_id,
+                "status": "processing",
+                "video_url": f"/{target_video_rel}",
+                "session_url": f"/{out_json_rel}"
             })
             return
 

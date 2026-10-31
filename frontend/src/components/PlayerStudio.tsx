@@ -260,6 +260,15 @@ export const PlayerStudio: React.FC<PlayerStudioProps> = ({
             >
               🎱 Club CCTV: Railbird 9-Ball
             </button>
+            {sessionMode === 'custom' && (
+              <button
+                className="rb-pill-btn active"
+                onClick={() => onSelectSession('custom')}
+                style={{ borderColor: 'var(--spring)', color: 'var(--spring)' }}
+              >
+                ✨ Custom Upload Session
+              </button>
+            )}
           </div>
         </div>
 

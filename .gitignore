@@ -2,6 +2,7 @@
 
 # Large video files
 SAMPLE.mp4
+uploads/
 *.avi
 *.mov
 *.mkv

@@ -8,6 +8,7 @@ import { DrillsView, DrillDef } from './components/DrillsView';
 import { ShotLab } from './components/ShotLab';
 import { LeaderboardsView } from './components/LeaderboardsView';
 import { QaView } from './components/QaView';
+import { UploadView } from './components/UploadView';
 
 export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState('match');
@@ -15,6 +16,7 @@ export const App: React.FC = () => {
   const [topcamSession, setTopcamSession] = useState<SessionData | null>(null);
   const [hsSession, setHsSession] = useState<SessionData | null>(null);
   const [clubSession, setClubSession] = useState<SessionData | null>(null);
+  const [customSession, setCustomSession] = useState<SessionData | null>(null);
   const [activeDrill, setActiveDrill] = useState<DrillDef | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -48,6 +50,7 @@ export const App: React.FC = () => {
   const activeSession = (
     sessionMode === 'topcam' ? topcamSession :
     sessionMode === 'hs' ? hsSession :
+    sessionMode === 'custom' ? (customSession || clubSession) :
     clubSession
   ) || topcamSession || hsSession;
 
@@ -120,6 +123,16 @@ export const App: React.FC = () => {
 
         {currentView === 'drills' && (
           <DrillsView onLaunchDrill={handleLaunchDrill} />
+        )}
+
+        {currentView === 'upload' && (
+          <UploadView
+            onSessionReady={(newSession) => {
+              setCustomSession(newSession);
+              setSessionMode('custom');
+              setCurrentView('match');
+            }}
+          />
         )}
 
         {currentView === 'shotlab' && (
