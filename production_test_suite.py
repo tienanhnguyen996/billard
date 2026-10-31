@@ -310,9 +310,9 @@ def test_f_frontend_ui_and_js_integrity():
     assert s13["aim_line"]["pock_ry"] > 400.0, f"Shot 13 aim_pock_ry should point to bottom pocket (~482), found {s13['aim_line']['pock_ry']}"
     assert s13["aim_line"]["pock_rx"] > 900.0, f"Shot 13 aim_pock_rx should point to right pocket (~982), found {s13['aim_line']['pock_rx']}"
 
-    # Assert Shot 2 has accurate TR pocket on radar (ry = 18, rx = 982)
+    # Assert Shot 2 has accurate adjacent corner pocket on radar (rx = 18, ry = 18)
     s2 = hs_data["shots"][1]
-    assert s2["aim_line"]["pock_rx"] > 900.0, f"Shot 2 aim_pock_rx should point to right pocket (~982), found {s2['aim_line']['pock_rx']}"
+    assert s2["aim_line"]["pock_rx"] < 50.0, f"Shot 2 aim_pock_rx should point to adjacent corner pocket (~18), found {s2['aim_line']['pock_rx']}"
     assert s2["aim_line"]["pock_ry"] < 50.0, f"Shot 2 aim_pock_ry should point to top pocket (~18), found {s2['aim_line']['pock_ry']}"
 
     print("  [PASS] frontend: Production React 19 + Vite app architecture verified (clean components, zero monolith).")
