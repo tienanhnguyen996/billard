@@ -159,10 +159,20 @@
       "aim_line": {
         "cb_rx": 661.4,
         "cb_ry": 176.9,
+        "ob_rx": 609.3,
+        "ob_ry": 220.1,
         "gb_rx": 619.3,
         "gb_ry": 240.3,
         "pock_rx": 500.0,
-        "pock_ry": 0.0
+        "pock_ry": 0.0,
+        "cb_x": 708.6,
+        "cb_y": 439.1,
+        "ob_x": 666.4,
+        "ob_y": 417.8,
+        "gb_x": 647.3,
+        "gb_y": 421.9,
+        "pock_x": 867.8,
+        "pock_y": 375.4
       },
       "is_highlight": true
     }
