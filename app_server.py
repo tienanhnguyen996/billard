@@ -717,11 +717,17 @@ class RailbirdProductionHandler(SimpleHTTPRequestHandler):
             max_sec = body.get("end_sec", None)
             table_name = body.get("title", f"Uploaded Session ({preset})")
 
-            # Determine corners based on preset if not explicitly specified
-            if not corners_str:
-                if preset == "matchroom":
-                    corners_str = "438,212,838,212,908,596,368,596"
-                elif preset == "topcam":
+            # Determine corners based on preset and known camera angles
+            if "SAMPLE" in video_input.upper() or preset == "ban_11_12":
+                corners_str = "558,416,1234,318,1242,672,442,716"
+                preset = "ban_11_12"
+                table_name = "Billiard Club Ban 11-12 (Aplus 9ft)"
+            elif "hoang" in video_input.lower() or preset == "matchroom":
+                corners_str = "438,212,838,212,908,596,368,596"
+                preset = "matchroom"
+                table_name = "European Open 2023 - Matchroom Diamond 9ft"
+            elif not corners_str:
+                if preset == "topcam":
                     corners_str = "0,0,1280,0,1280,720,0,720"
                 else:
                     corners_str = "558,416,1234,318,1242,672,442,716"

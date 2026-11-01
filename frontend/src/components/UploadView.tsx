@@ -54,6 +54,24 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSessionReady }) => {
     }
   };
 
+  const handleExistingVideoChange = (val: string) => {
+    setExistingVideo(val);
+    if (val === 'SAMPLE.mp4') {
+      setPreset('ban_11_12');
+      setCustomCorners('558,416,1234,318,1242,672,442,716');
+    } else if (val === 'hoang_sao.mp4') {
+      setPreset('matchroom');
+      setCustomCorners('438,212,838,212,908,596,368,596');
+    }
+  };
+
+  const handlePresetSelect = (p: 'ban_11_12' | 'matchroom' | 'topcam' | 'custom') => {
+    setPreset(p);
+    if (p === 'ban_11_12') setCustomCorners('558,416,1234,318,1242,672,442,716');
+    else if (p === 'matchroom') setCustomCorners('438,212,838,212,908,596,368,596');
+    else if (p === 'topcam') setCustomCorners('0,0,1280,0,1280,720,0,720');
+  };
+
   // Poll job status
   useEffect(() => {
     if (!jobId || status !== 'processing') return;
@@ -236,7 +254,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSessionReady }) => {
                 </label>
                 <select
                   value={existingVideo}
-                  onChange={(e) => setExistingVideo(e.target.value)}
+                  onChange={(e) => handleExistingVideoChange(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '0.65rem 0.9rem',
@@ -304,10 +322,10 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSessionReady }) => {
               <Compass size={18} color="var(--cyan)" /> 2. Camera Angle & Cushion Calibration
             </h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1.2rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
               <button
                 className={`rb-btn ${preset === 'ban_11_12' ? 'active' : ''}`}
-                onClick={() => setPreset('ban_11_12')}
+                onClick={() => handlePresetSelect('ban_11_12')}
                 style={{ flexDirection: 'column', height: 'auto', padding: '0.75rem 0.5rem', textAlign: 'center' }}
               >
                 <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Club CCTV</div>
@@ -316,7 +334,7 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSessionReady }) => {
 
               <button
                 className={`rb-btn ${preset === 'matchroom' ? 'active' : ''}`}
-                onClick={() => setPreset('matchroom')}
+                onClick={() => handlePresetSelect('matchroom')}
                 style={{ flexDirection: 'column', height: 'auto', padding: '0.75rem 0.5rem', textAlign: 'center' }}
               >
                 <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>TV Broadcast</div>
@@ -325,12 +343,36 @@ export const UploadView: React.FC<UploadViewProps> = ({ onSessionReady }) => {
 
               <button
                 className={`rb-btn ${preset === 'topcam' ? 'active' : ''}`}
-                onClick={() => setPreset('topcam')}
+                onClick={() => handlePresetSelect('topcam')}
                 style={{ flexDirection: 'column', height: 'auto', padding: '0.75rem 0.5rem', textAlign: 'center' }}
               >
                 <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>Overhead Top-Cam</div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--mut)', marginTop: 2 }}>1:1 Bird's Eye View</div>
               </button>
+            </div>
+
+            {/* Active Table Calibration Status Card */}
+            <div style={{ marginBottom: '1.25rem', padding: '0.85rem 1rem', borderRadius: 8, background: 'var(--ink-2)', border: '1px solid var(--panel-border)', fontSize: '0.82rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ color: 'var(--mut)', fontWeight: 600 }}>CALIBRATED TABLE:</span>
+                <span style={{ color: 'var(--spring)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <CheckCircle2 size={14} />
+                  {preset === 'ban_11_12' ? 'Billiard Club 9ft (Aplus)' : preset === 'matchroom' ? 'Matchroom Diamond 9ft' : '1:1 Overhead Table'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, color: 'var(--mut)', fontSize: '0.76rem' }}>
+                <span>4 Cushion Corners:</span>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--volt)', fontWeight: 600 }}>
+                  {preset === 'ban_11_12' ? '558,416 | 1234,318 | 1242,672 | 442,716' : preset === 'matchroom' ? '438,212 | 838,212 | 908,596 | 368,596' : '0,0 | 1280,0 | 1280,720 | 0,720'}
+                </span>
+              </div>
+              <div style={{ color: 'var(--mut)', fontSize: '0.74rem' }}>
+                {preset === 'ban_11_12'
+                  ? '🎯 1920x1080 perspective warp with neural solid/stripe classification and temporal multi-ball tracker.'
+                  : preset === 'matchroom'
+                  ? '🎯 European Open Diamond 9ft broadcast camera homography.'
+                  : '🎯 Direct 1:1 bird\'s-eye overhead drill mapping.'}
+              </div>
             </div>
 
             {/* Max Duration Slider */}

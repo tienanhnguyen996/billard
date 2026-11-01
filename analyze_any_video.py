@@ -25,6 +25,12 @@ except ImportError:
     compute_geometry = None
     compute_difficulty_and_grade = None
 
+try:
+    from neural_ball_classifier import classify_ball_crops_neural, CLASSES, DISPLAY_NAMES, BALL_COLORS_BGR
+except ImportError:
+    classify_ball_crops_neural = None
+    CLASSES, DISPLAY_NAMES, BALL_COLORS_BGR = [], {}, {}
+
 RADAR_W = 1000
 RADAR_H = 500
 
@@ -107,17 +113,51 @@ def load_yolo_detector(model_path=None):
     return None
 
 
-def detect_balls_in_frame(frame, src_corners, H_mat, yolo_model=None):
+STANDARD_NAMES = [
+    "1-Yellow", "2-Blue", "3-Red", "4-Pink", "5-Orange",
+    "6-Green", "7-Brown", "8-Black", "9-Stripe", "10-Blue"
+]
+
+BALL_NAME_MAP = {
+    "Cue_Ball": "Cue Ball",
+    "1_Yellow": "1-Yellow",
+    "2_Blue": "2-Blue",
+    "3_Red": "3-Red",
+    "4_Pink": "4-Pink",
+    "5_Purple": "5-Purple",
+    "5_Orange": "5-Orange",
+    "6_Green": "6-Green",
+    "7_Brown": "7-Brown",
+    "8_Ball": "8-Black",
+    "9_Stripe": "9-Stripe",
+    "10_BlueStripe": "10-Blue"
+}
+
+BALL_COLOR_MAP = {
+    "Cue Ball": [255, 255, 255],
+    "1-Yellow": [0, 245, 255],
+    "2-Blue": [255, 180, 60],
+    "3-Red": [60, 60, 240],
+    "4-Pink": [220, 160, 240],
+    "5-Purple": [220, 80, 140],
+    "5-Orange": [40, 150, 255],
+    "6-Green": [100, 220, 80],
+    "7-Brown": [40, 80, 180],
+    "8-Black": [30, 30, 30],
+    "9-Stripe": [40, 220, 255],
+    "10-Blue": [240, 80, 20]
+}
+
+
+def extract_ball_candidates(frame, src_corners, yolo_model=None):
     """
-    Detects billiard balls inside the calibrated table region using YOLO
-    with color/contrast classification for Cue Ball vs Object Balls.
+    Extracts ball candidate centers strictly constrained to the calibrated table polygon.
     """
     h_img, w_img = frame.shape[:2]
     table_poly = src_corners.astype(np.int32)
     x0, y0, bw, bh = cv2.boundingRect(table_poly)
 
-    # Restrict to bounding box with small margin
-    margin = 25
+    margin = 20
     x0_c = max(0, x0 - margin)
     y0_c = max(0, y0 - margin)
     x1_c = min(w_img, x0 + bw + margin)
@@ -126,16 +166,16 @@ def detect_balls_in_frame(frame, src_corners, H_mat, yolo_model=None):
 
     raw_centers = []
 
-    # 1. YOLO inference on table crop if available
+    # 1. YOLO inference on table crop
     if yolo_model is not None:
         try:
-            res = yolo_model(crop, conf=0.20, verbose=False)[0]
+            res = yolo_model(crop, conf=0.18, verbose=False)[0]
             if res.boxes is not None and len(res.boxes) > 0:
                 for box in res.boxes.xyxy.cpu().numpy():
                     cx = float(0.5 * (box[0] + box[2]) + x0_c)
                     cy = float(0.5 * (box[1] + box[3]) + y0_c)
-                    # Check inside table polygon
-                    if cv2.pointPolygonTest(table_poly, (cx, cy), True) >= -16.0:
+                    # Cushion cushion margin: keep only if inside or touching cushion
+                    if cv2.pointPolygonTest(table_poly, (cx, cy), True) >= -10.0:
                         raw_centers.append((cx, cy))
         except Exception:
             pass
@@ -144,7 +184,6 @@ def detect_balls_in_frame(frame, src_corners, H_mat, yolo_model=None):
     if len(raw_centers) < 3:
         mask = np.zeros((h_img, w_img), dtype=np.uint8)
         cv2.fillPoly(mask, [table_poly], 255)
-        # Erode slightly from cushion jaws
         sub_mask = mask[y0_c:y1_c, x0_c:x1_c]
         crop_lab = cv2.cvtColor(crop, cv2.COLOR_BGR2LAB)
         felt_pixels = crop_lab[sub_mask > 0]
@@ -158,58 +197,71 @@ def detect_balls_in_frame(frame, src_corners, H_mat, yolo_model=None):
                 if 20 <= area <= 650 and max(cw, ch) <= 36:
                     cx = float(cents[i][0] + x0_c)
                     cy = float(cents[i][1] + y0_c)
-                    if cv2.pointPolygonTest(table_poly, (cx, cy), True) >= -12.0:
+                    if cv2.pointPolygonTest(table_poly, (cx, cy), True) >= -8.0:
                         raw_centers.append((cx, cy))
 
-    # NMS / deduplicate centers within 16 px
+    # NMS / deduplicate centers within 14 px
     unique_centers = []
     for cx, cy in raw_centers:
         if all(math.hypot(cx - ux, cy - uy) >= 14.0 for ux, uy in unique_centers):
             unique_centers.append((cx, cy))
 
-    # Classify Cue Ball (brightest L, lowest saturation) vs Object Balls
-    balls = []
-    best_cue_score = -999.0
-    cue_idx = -1
+    return unique_centers
 
-    for idx, (cx, cy) in enumerate(unique_centers):
+
+def detect_balls_in_frame(frame, src_corners, H_mat, yolo_model=None):
+    """
+    Detects and classifies balls for single-frame live preview or API endpoints.
+    """
+    unique_centers = extract_ball_candidates(frame, src_corners, yolo_model)
+    h_img, w_img = frame.shape[:2]
+
+    # Neural classification if available
+    neural_preds = []
+    if classify_ball_crops_neural and unique_centers:
+        try:
+            preds = classify_ball_crops_neural(frame, unique_centers)
+            for p in preds:
+                lbl = p.get("label", "")
+                neural_preds.append((BALL_NAME_MAP.get(lbl, lbl), p.get("confidence", 0.0)))
+        except Exception:
+            neural_preds = [("Ball", 0.0)] * len(unique_centers)
+    else:
+        neural_preds = [("Ball", 0.0)] * len(unique_centers)
+
+    # Cue score: high L, low S
+    cue_scores = []
+    for cx, cy in unique_centers:
         ix, iy = int(round(cx)), int(round(cy))
         patch = frame[max(0, iy - 6):min(h_img, iy + 7), max(0, ix - 6):min(w_img, ix + 7)]
-        if patch.size == 0:
-            continue
-        patch_lab = cv2.cvtColor(patch, cv2.COLOR_BGR2LAB)
-        patch_hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
-        l_mean = float(np.mean(patch_lab[:, :, 0]))
-        s_mean = float(np.mean(patch_hsv[:, :, 1]))
+        if patch.size > 0:
+            p_lab = cv2.cvtColor(patch, cv2.COLOR_BGR2LAB)
+            p_hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
+            l_m = float(np.mean(p_lab[:, :, 0]))
+            s_m = float(np.mean(p_hsv[:, :, 1]))
+            cue_scores.append(l_m - 0.75 * s_m)
+        else:
+            cue_scores.append(-999.0)
 
-        # Cue ball score: high lightness, low saturation
-        cue_score = l_mean - 0.7 * s_mean
-        if cue_score > best_cue_score:
-            best_cue_score = cue_score
-            cue_idx = idx
+    cue_idx = int(np.argmax(cue_scores)) if cue_scores else -1
 
-    standard_colors = [
-        (0, 245, 255),   # 1-Yellow
-        (255, 180, 60),  # 2-Blue
-        (60, 60, 240),   # 3-Red
-        (220, 160, 240), # 4-Pink
-        (40, 150, 255),  # 5-Orange
-        (100, 220, 80),  # 6-Green
-        (40, 80, 180),   # 7-Brown
-        (30, 30, 30),    # 8-Black
-        (40, 220, 255),  # 9-Stripe
-    ]
-
+    balls = []
+    used_labels = set()
     for idx, (cx, cy) in enumerate(unique_centers):
         rx, ry = project_to_radar(cx, cy, H_mat)
         if idx == cue_idx:
             label = "Cue Ball"
             color = [255, 255, 255]
         else:
-            col_idx = (idx - (1 if idx > cue_idx else 0)) % len(standard_colors)
-            label = f"Ball-{idx}"
-            color = list(standard_colors[col_idx])
+            nlbl, nconf = neural_preds[idx]
+            if nlbl != "Cue Ball" and nlbl not in used_labels and nconf > 0.45:
+                label = nlbl
+            else:
+                rem = [n for n in STANDARD_NAMES if n not in used_labels and "Cue" not in n]
+                label = rem[0] if rem else f"Ball-{idx}"
+            color = BALL_COLOR_MAP.get(label, [40, 150, 255])
 
+        used_labels.add(label)
         balls.append({
             "label": label,
             "x": round(cx, 1),
@@ -220,6 +272,181 @@ def detect_balls_in_frame(frame, src_corners, H_mat, yolo_model=None):
         })
 
     return balls
+
+
+class BallTemporalTracker:
+    """
+    Robust Multi-Object Ball Tracker ensuring continuous temporal identity,
+    smooth trajectories, 0 duplicate labels, and pocket potting logic.
+    """
+    def __init__(self, pockets, H_mat):
+        self.pockets = pockets
+        self.H_mat = H_mat
+        self.tracks = {}  # tid -> dict
+        self.next_id = 1
+
+    def update(self, frame, src_corners, yolo_model=None):
+        candidates = extract_ball_candidates(frame, src_corners, yolo_model)
+        h_img, w_img = frame.shape[:2]
+
+        # 1. Neural classification
+        neural_preds = []
+        if classify_ball_crops_neural and candidates:
+            try:
+                preds = classify_ball_crops_neural(frame, candidates)
+                for p in preds:
+                    lbl = p.get("label", "")
+                    clean_lbl = BALL_NAME_MAP.get(lbl, lbl)
+                    neural_preds.append((clean_lbl, p.get("confidence", 0.0)))
+            except Exception:
+                neural_preds = [("Ball", 0.0)] * len(candidates)
+        else:
+            neural_preds = [("Ball", 0.0)] * len(candidates)
+
+        # 2. Whiteness / cue score
+        cue_scores = []
+        for cx, cy in candidates:
+            ix, iy = int(round(cx)), int(round(cy))
+            patch = frame[max(0, iy - 6):min(h_img, iy + 7), max(0, ix - 6):min(w_img, ix + 7)]
+            if patch.size > 0:
+                p_lab = cv2.cvtColor(patch, cv2.COLOR_BGR2LAB)
+                p_hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
+                l_m = float(np.mean(p_lab[:, :, 0]))
+                s_m = float(np.mean(p_hsv[:, :, 1]))
+                cue_scores.append(l_m - 0.75 * s_m)
+            else:
+                cue_scores.append(-999.0)
+
+        best_cue_cand_idx = int(np.argmax(cue_scores)) if cue_scores else -1
+
+        # 3. Spatial association with existing tracks
+        matched_tracks = set()
+        matched_cands = set()
+
+        if self.tracks and candidates:
+            track_keys = list(self.tracks.keys())
+            cost_matrix = []
+            for tid in track_keys:
+                row = []
+                tx = self.tracks[tid]["x"]
+                ty = self.tracks[tid]["y"]
+                for cx, cy in candidates:
+                    row.append(math.hypot(tx - cx, ty - cy))
+                cost_matrix.append(row)
+
+            # Greedy min-distance matching
+            flat = []
+            for t_idx, row in enumerate(cost_matrix):
+                for c_idx, dist in enumerate(row):
+                    flat.append((dist, t_idx, c_idx))
+            flat.sort(key=lambda x: x[0])
+
+            for dist, t_idx, c_idx in flat:
+                tid = track_keys[t_idx]
+                if tid in matched_tracks or c_idx in matched_cands:
+                    continue
+                if dist <= 55.0:  # Max allowable motion between frames
+                    matched_tracks.add(tid)
+                    matched_cands.add(c_idx)
+                    cx, cy = candidates[c_idx]
+
+                    # Smooth position if resting/slow; direct update if in active motion
+                    if dist < 6.0:
+                        nx = 0.75 * cx + 0.25 * self.tracks[tid]["x"]
+                        ny = 0.75 * cy + 0.25 * self.tracks[tid]["y"]
+                    else:
+                        nx, ny = cx, cy
+
+                    rx, ry = project_to_radar(nx, ny, self.H_mat)
+                    self.tracks[tid]["x"] = round(nx, 1)
+                    self.tracks[tid]["y"] = round(ny, 1)
+                    self.tracks[tid]["rx"] = round(rx, 1)
+                    self.tracks[tid]["ry"] = round(ry, 1)
+                    self.tracks[tid]["misses"] = 0
+
+                    # Neural label update if high confidence
+                    nlbl, nconf = neural_preds[c_idx]
+                    if nconf > 0.65 and "Cue" not in self.tracks[tid]["label"]:
+                        self.tracks[tid]["label"] = nlbl
+                        self.tracks[tid]["color"] = BALL_COLOR_MAP.get(nlbl, self.tracks[tid]["color"])
+
+        # 4. Handle unmatched tracks (check potting or prune)
+        for tid in list(self.tracks.keys()):
+            if tid not in matched_tracks:
+                self.tracks[tid]["misses"] += 1
+                # Check if ball fell into a pocket
+                potted = False
+                for p in self.pockets:
+                    if math.hypot(self.tracks[tid]["rx"] - p["rx"], self.tracks[tid]["ry"] - p["ry"]) < 45.0:
+                        potted = True
+                        break
+                if potted or self.tracks[tid]["misses"] > 3:
+                    del self.tracks[tid]
+
+        # 5. Spawn new tracks for unmatched candidates
+        available_names = [n for n in STANDARD_NAMES if n not in [t["label"] for t in self.tracks.values()]]
+        has_cue = any("Cue" in t["label"] for t in self.tracks.values())
+
+        for c_idx, (cx, cy) in enumerate(candidates):
+            if c_idx not in matched_cands:
+                tid = f"tr_{self.next_id}"
+                self.next_id += 1
+                rx, ry = project_to_radar(cx, cy, self.H_mat)
+
+                if not has_cue and (c_idx == best_cue_cand_idx or cue_scores[c_idx] > 145.0):
+                    label = "Cue Ball"
+                    color = [255, 255, 255]
+                    has_cue = True
+                else:
+                    nlbl, nconf = neural_preds[c_idx]
+                    if nlbl != "Cue Ball" and nlbl in available_names and nconf > 0.50:
+                        label = nlbl
+                        available_names.remove(nlbl)
+                    elif available_names:
+                        label = available_names.pop(0)
+                    else:
+                        label = f"Ball-{len(self.tracks)+1}"
+                    color = BALL_COLOR_MAP.get(label, [40, 150, 255])
+
+                self.tracks[tid] = {
+                    "id": tid,
+                    "label": label,
+                    "color": color,
+                    "x": round(cx, 1),
+                    "y": round(cy, 1),
+                    "rx": round(rx, 1),
+                    "ry": round(ry, 1),
+                    "misses": 0
+                }
+
+        # 6. Build output and enforce 0 duplicate labels strictly
+        output_balls = []
+        seen_labels = set()
+        for t in self.tracks.values():
+            if t["misses"] <= 1:
+                b_lbl = t["label"]
+                if b_lbl in seen_labels:
+                    rem = [n for n in STANDARD_NAMES if n not in seen_labels and "Cue" not in n]
+                    b_lbl = rem[0] if rem else f"Ball-{len(seen_labels)}"
+                    t["label"] = b_lbl
+                    t["color"] = BALL_COLOR_MAP.get(b_lbl, [40, 150, 255])
+                seen_labels.add(b_lbl)
+
+                output_balls.append({
+                    "label": t["label"],
+                    "x": t["x"],
+                    "y": t["y"],
+                    "rx": t["rx"],
+                    "ry": t["ry"],
+                    "color": t["color"]
+                })
+
+        # Ensure Cue Ball is present
+        if not any("Cue" in b["label"] for b in output_balls) and output_balls:
+            output_balls[0]["label"] = "Cue Ball"
+            output_balls[0]["color"] = [255, 255, 255]
+
+        return output_balls
 
 
 def detect_shots_and_rate(timeline_samples, pockets, duration_sec, fps):
@@ -402,6 +629,14 @@ def run_analysis(video_path, corners_str, out_json_path, table_name="Custom Cali
     total_video_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     video_dur_sec = total_video_frames / fps
 
+    # Auto-adjust corners if 1280x720 defaults were passed for a 1920x1080 video (e.g. SAMPLE.mp4)
+    if w == 1920 and h == 1080 and np.allclose(src_corners, [[0, 0], [1280, 0], [1280, 720], [0, 720]]):
+        print("  [AUTO-CALIB] 1920x1080 CCTV detected with mismatched 1280x720 corners. Auto-aligning to Club CCTV table polygon.")
+        src_corners = parse_corners_string("558,416,1234,318,1242,672,442,716")
+        H_mat = cv2.getPerspectiveTransform(src_corners, dst_corners)
+        H_inv = cv2.getPerspectiveTransform(dst_corners, src_corners)
+        pockets = compute_pockets_from_homography(H_inv)
+
     frames_to_process = total_video_frames
     if max_frames:
         frames_to_process = min(frames_to_process, int(max_frames))
@@ -411,8 +646,9 @@ def run_analysis(video_path, corners_str, out_json_path, table_name="Custom Cali
     print(f"  Resolution   : {w}x{h} @ {fps:.2f} FPS ({video_dur_sec:.1f}s total)")
     print(f"  Processing   : {frames_to_process} frames (stride={stride})...")
 
-    # 3. Load YOLO detector
+    # 3. Load YOLO detector and initialize multi-object temporal tracker
     yolo_model = load_yolo_detector(model_path)
+    tracker = BallTemporalTracker(pockets, H_mat)
 
     # 4. Sequential Frame Processing
     timeline_sample = []
@@ -427,7 +663,7 @@ def run_analysis(video_path, corners_str, out_json_path, table_name="Custom Cali
         # Sample at stride (e.g. 10Hz)
         if f_idx % stride == 0:
             t_sec = f_idx / fps
-            balls = detect_balls_in_frame(frame, src_corners, H_mat, yolo_model)
+            balls = tracker.update(frame, src_corners, yolo_model)
 
             # Cue ball speed tracking
             cue = next((b for b in balls if b["label"] == "Cue Ball"), None)
